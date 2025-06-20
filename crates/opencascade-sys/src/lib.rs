@@ -465,6 +465,7 @@ pub mod ffi {
         pub fn ShapeType(self: &TopoDS_Shape) -> TopAbs_ShapeEnum;
 
         pub fn TopoDS_Shape_DumpJson(shape: &TopoDS_Shape) -> UniquePtr<CxxString>;
+        pub fn TopoDS_Edge_DumpJson(shape: &TopoDS_Edge) -> UniquePtr<CxxString>;
 
         type TopAbs_Orientation;
         pub fn Orientation(self: &TopoDS_Shape) -> TopAbs_Orientation;

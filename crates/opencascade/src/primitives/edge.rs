@@ -163,6 +163,10 @@ impl Edge {
 
         EdgeType::from(curve.GetType())
     }
+
+    pub fn dump_json(&self) -> String {
+        ffi::TopoDS_Edge_DumpJson(&self.inner).to_string()
+    }
 }
 
 pub struct ApproximationSegmentIterator {

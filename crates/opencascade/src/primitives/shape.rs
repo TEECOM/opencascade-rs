@@ -764,9 +764,10 @@ mod test {
     use super::*;
     #[test]
     fn dump_json() {
-        let s = Shape::box_centered(1., 2., 3.);
+        let e =
+            Edge::arc(glam::dvec3(0., -1., 0.), glam::dvec3(1., 0., 0.), glam::dvec3(0., 1., 0.));
 
-        let res = s.dump_json();
+        let res = e.dump_json();
 
         println!("{}", res);
 
