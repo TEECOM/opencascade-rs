@@ -719,6 +719,10 @@ impl Shape {
 
         Self::from_shape(make_hole.pin_mut().Shape())
     }
+
+    pub fn dump_json(&self) -> String {
+        String::from("")
+    }
 }
 
 /// Information about a point where a line hits (i.e. intersects) a face
@@ -752,5 +756,18 @@ impl ChamferMaker {
 
     pub fn build(mut self) -> Shape {
         Shape::from_shape(self.inner.pin_mut().Shape())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn dump_json() {
+        let s = Shape::box_centered(1., 2., 3.);
+
+        let res = s.dump_json();
+
+        assert!(res.len() > 0);
     }
 }
