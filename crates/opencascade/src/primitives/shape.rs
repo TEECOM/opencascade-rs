@@ -764,8 +764,10 @@ mod test {
     use super::*;
     #[test]
     fn dump_json() {
-        let e =
-            Edge::arc(glam::dvec3(0., -1., 0.), glam::dvec3(1., 0., 0.), glam::dvec3(0., 1., 0.));
+        let e = Edge::spline_from_points(
+            vec![dvec3(0., 0., 0.), dvec3(1., 1., 0.)],
+            Some((dvec3(1., 0., 0.), dvec3(f64::sqrt(2.), f64::sqrt(2.), 0.))),
+        );
 
         let res = e.dump_json();
 
