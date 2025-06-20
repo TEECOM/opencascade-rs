@@ -1,3 +1,4 @@
+use cxx::CxxString;
 #[cxx::bridge]
 pub mod ffi {
     #[repr(u32)]
@@ -463,6 +464,8 @@ pub mod ffi {
         pub fn IsNull(self: &TopoDS_Shape) -> bool;
         pub fn IsEqual(self: &TopoDS_Shape, other: &TopoDS_Shape) -> bool;
         pub fn ShapeType(self: &TopoDS_Shape) -> TopAbs_ShapeEnum;
+
+        pub fn TopoDS_Shape_DumpJson(shape: &TopoDS_Shape) -> UniquePtr<CxxString>;
 
         type TopAbs_Orientation;
         pub fn Orientation(self: &TopoDS_Shape) -> TopAbs_Orientation;
