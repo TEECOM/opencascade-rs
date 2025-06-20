@@ -721,7 +721,7 @@ impl Shape {
     }
 
     pub fn dump_json(&self) -> String {
-        String::from("")
+        ffi::TopoDS_Shape_DumpJson(&self.inner).to_string()
     }
 }
 
@@ -768,6 +768,8 @@ mod test {
 
         let res = s.dump_json();
 
-        assert!(res.len() > 0);
+        println!("{}", res);
+
+        assert!(false);
     }
 }
