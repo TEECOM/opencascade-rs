@@ -1,4 +1,3 @@
-use cxx::CxxString;
 #[cxx::bridge]
 pub mod ffi {
     #[repr(u32)]
