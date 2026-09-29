@@ -146,6 +146,11 @@ inline std::unique_ptr<gp_Pnt> HandleGeomCurve_Value(const HandleGeomCurve &curv
   return std::unique_ptr<gp_Pnt>(new gp_Pnt(curve->Value(U)));
 }
 
+inline std::unique_ptr<gp_Pnt> HandleGeomSurface_Value(const HandleGeomSurface &surface, const Standard_Real U,
+                                                       const Standard_Real V) {
+  return std::unique_ptr<gp_Pnt>(new gp_Pnt(surface->Value(U, V)));
+}
+
 inline std::unique_ptr<gp_Pnt> GCPnts_TangentialDeflection_Value(const GCPnts_TangentialDeflection &approximator,
                                                                  Standard_Integer i) {
   return std::unique_ptr<gp_Pnt>(new gp_Pnt(approximator.Value(i)));
@@ -474,6 +479,11 @@ BRepFilletAPI_MakeFillet2d_add_chamfer_angle(BRepFilletAPI_MakeFillet2d &make_fi
 // BRepTools
 inline std::unique_ptr<TopoDS_Wire> outer_wire(const TopoDS_Face &face) {
   return std::unique_ptr<TopoDS_Wire>(new TopoDS_Wire(BRepTools::OuterWire(face)));
+}
+
+inline void face_uv_bounds(const TopoDS_Face &face, Standard_Real &u_min, Standard_Real &u_max, Standard_Real &v_min,
+                           Standard_Real &v_max) {
+  BRepTools::UVBounds(face, u_min, u_max, v_min, v_max);
 }
 
 inline bool write_brep_text(const TopoDS_Shape &shape, rust::String path) {

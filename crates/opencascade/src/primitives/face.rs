@@ -279,6 +279,41 @@ impl Face {
         self.normal_at(center)
     }
 
+    /// Parameter-space bounds of the face as `((u_min, u_max), (v_min, v_max))`.
+    pub fn uv_bounds(&self) -> ((f64, f64), (f64, f64)) {
+        let (mut u_min, mut u_max, mut v_min, mut v_max) = (0.0, 0.0, 0.0, 0.0);
+        ffi::face_uv_bounds(&self.inner, &mut u_min, &mut u_max, &mut v_min, &mut v_max);
+
+        ((u_min, u_max), (v_min, v_max))
+    }
+
+    /// Evaluate the face's surface at the raw parameters `(u, v)`.
+    pub fn point_at_uv(&self, u: f64, v: f64) -> DVec3 {
+        let surface = ffi::BRep_Tool_Surface(&self.inner);
+        let point = ffi::HandleGeomSurface_Value(&surface, u, v);
+
+        dvec3(point.X(), point.Y(), point.Z())
+    }
+
+    /// Evaluate the face at `(u, v)` in `[0, 1]` across its parameter bounds.
+    ///
+    /// Only meaningful for planar faces, and the u/v axis directions depend on how the face
+    /// was built, so opposing faces may need mirrored coordinates.
+    pub fn point_at_normalized_uv(&self, u: f64, v: f64) -> DVec3 {
+        let ((u_min, u_max), (v_min, v_max)) = self.uv_bounds();
+
+        self.point_at_uv(u_min + u * (u_max - u_min), v_min + v * (v_max - v_min))
+    }
+
+    /// Orthogonally project `point` onto this face's plane.
+    ///
+    /// Only meaningful for planar faces, and the result may lie outside the face's bounds.
+    pub fn project_point_to_plane(&self, point: DVec3) -> DVec3 {
+        let normal = self.normal_at_center().normalize();
+
+        point - normal * (point - self.center_of_mass()).dot(normal)
+    }
+
     pub fn workplane(&self) -> Workplane {
         const NORMAL_DIFF_TOLERANCE: f64 = 0.0001;
 
@@ -508,6 +543,17 @@ impl From<ffi::TopAbs_Orientation> for FaceOrientation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::primitives::Edge;
+
+    fn assert_close(actual: DVec3, expected: DVec3) {
+        assert!(actual.distance(expected) < 1e-6, "expected {expected}, got {actual}");
+    }
+
+    // The mean of a box's six face centers is the box's center.
+    fn mean_face_center(shape: &Shape) -> DVec3 {
+        let centers: Vec<DVec3> = shape.faces().map(|face| face.center_of_mass()).collect();
+        centers.iter().sum::<DVec3>() / centers.len() as f64
+    }
 
     #[test]
     fn test_add() {
@@ -517,5 +563,84 @@ mod tests {
             "Expected surface_area() to be ~35.0, was actually {}",
             face.surface_area()
         );
+    }
+
+    #[test]
+    fn normalized_uv_center_is_center_of_mass() {
+        let face = Workplane::xy().rect(4.0, 2.0).to_face();
+
+        assert_close(face.point_at_normalized_uv(0.5, 0.5), face.center_of_mass());
+    }
+
+    #[test]
+    fn normalized_uv_stays_on_face_plane() {
+        let face = Workplane::xy().translated(dvec3(0.0, 0.0, 3.0)).rect(4.0, 2.0).to_face();
+
+        assert!((face.point_at_normalized_uv(0.25, 0.75).z - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn opposing_box_faces_mirror_uv_coordinates() {
+        let cube = Shape::box_centered(2.0, 2.0, 2.0);
+        let face_with_normal = |normal: DVec3| {
+            cube.faces()
+                .find(|face| face.normal_at_center().distance(normal) < 1e-6)
+                .expect("cube should have a face with this normal")
+        };
+        let pos_x = face_with_normal(DVec3::X);
+        let neg_x = face_with_normal(DVec3::NEG_X);
+
+        let point = pos_x.point_at_normalized_uv(0.25, 0.75);
+        let mirrored = dvec3(-point.x, point.y, point.z);
+
+        // Which of these matches depends on the u/v direction of each face.
+        let candidates =
+            [neg_x.point_at_normalized_uv(0.25, 0.75), neg_x.point_at_normalized_uv(0.75, 0.75)];
+        assert!(candidates.iter().any(|candidate| candidate.distance(mirrored) < 1e-6));
+    }
+
+    #[test]
+    fn project_point_lands_on_face_plane() {
+        let face = Workplane::xy().translated(dvec3(0.0, 0.0, 3.0)).rect(4.0, 2.0).to_face();
+
+        assert_close(face.project_point_to_plane(dvec3(1.5, -0.5, 10.0)), dvec3(1.5, -0.5, 3.0));
+    }
+
+    #[test]
+    fn projection_between_unequal_faces_stays_perpendicular() {
+        let wide = Workplane::xz().rect(6.0, 2.0).to_face();
+        let narrow = Workplane::xz().translated(dvec3(0.0, 0.0, -5.0)).rect(2.0, 2.0).to_face();
+
+        let start = narrow.point_at_normalized_uv(0.25, 0.75);
+        let end = wide.project_point_to_plane(start);
+
+        assert!((end - start).cross(wide.normal_at_center()).length() < 1e-6);
+        assert!(((end - start).length() - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn sweep_between_two_points_spans_them() {
+        let (start, end) = (dvec3(-1.0, 0.0, 0.0), dvec3(3.0, 0.0, 0.0));
+        let path = Wire::from_edges([&Edge::segment(start, end)]);
+
+        let mut workplane = Workplane::new(DVec3::Y, end - start);
+        workplane.set_translation(start);
+        let bar = Shape::from(workplane.rect(0.5, 0.5).to_face().sweep_along(&path));
+
+        assert_close(mean_face_center(&bar), (start + end) / 2.0);
+    }
+
+    #[test]
+    fn repositioned_workplane_offsets_the_sweep() {
+        let (start, end) = (dvec3(-1.0, 0.0, 0.0), dvec3(3.0, 0.0, 0.0));
+        let path = Wire::from_edges([&Edge::segment(start, end)]);
+
+        let mut workplane = Workplane::new(DVec3::Y, end - start);
+        workplane.set_translation(start);
+        let offset_workplane = workplane.translated(dvec3(0.0, 1.0, 0.0));
+        let shift = offset_workplane.origin() - workplane.origin();
+        let bar = Shape::from(offset_workplane.rect(0.5, 0.5).to_face().sweep_along(&path));
+
+        assert_close(mean_face_center(&bar), (start + end) / 2.0 + shift);
     }
 }
