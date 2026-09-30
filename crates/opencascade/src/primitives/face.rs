@@ -279,6 +279,42 @@ impl Face {
         self.normal_at(center)
     }
 
+    /// Parameter-space bounds of the face as `((u_min, u_max), (v_min, v_max))`.
+    pub fn uv_bounds(&self) -> ((f64, f64), (f64, f64)) {
+        let [u_min, u_max, v_min, v_max] = ffi::face_uv_bounds(&self.inner);
+
+        ((u_min, u_max), (v_min, v_max))
+    }
+
+    /// Evaluate the face's surface at the raw parameters `(u, v)`.
+    pub fn point_at_uv(&self, u: f64, v: f64) -> DVec3 {
+        let surface = ffi::BRep_Tool_Surface(&self.inner);
+        let point = ffi::HandleGeomSurface_Value(&surface, u, v);
+
+        dvec3(point.X(), point.Y(), point.Z())
+    }
+
+    /// Evaluate the face at `(u, v)` in its parameter domain, then normalize
+    /// to the range `[0, 1]`.
+    ///
+    /// Only meaningful for planar faces. Note that `u` and `v` axis directions depend on
+    /// how the face was built. Faces constructed or oriented in different coordinate
+    /// frames will not necessarily produce aligned points.
+    pub fn point_at_normalized_uv(&self, u: f64, v: f64) -> DVec3 {
+        let ((u_min, u_max), (v_min, v_max)) = self.uv_bounds();
+
+        self.point_at_uv(u_min + u * (u_max - u_min), v_min + v * (v_max - v_min))
+    }
+
+    /// Orthogonally project `point` onto this face's plane.
+    ///
+    /// Only meaningful for planar faces, and the result may lie outside the face's bounds.
+    pub fn project_point_to_plane(&self, point: DVec3) -> DVec3 {
+        let normal = self.normal_at_center().normalize();
+
+        point - normal * (point - self.center_of_mass()).dot(normal)
+    }
+
     pub fn workplane(&self) -> Workplane {
         const NORMAL_DIFF_TOLERANCE: f64 = 0.0001;
 
@@ -509,6 +545,10 @@ impl From<ffi::TopAbs_Orientation> for FaceOrientation {
 mod tests {
     use super::*;
 
+    fn assert_close(actual: DVec3, expected: DVec3) {
+        assert!(actual.distance(expected) < 1e-6, "expected {expected}, got {actual}");
+    }
+
     #[test]
     fn test_add() {
         let face = Workplane::xy().rect(7.0, 5.0).to_face();
@@ -517,5 +557,42 @@ mod tests {
             "Expected surface_area() to be ~35.0, was actually {}",
             face.surface_area()
         );
+    }
+
+    #[test]
+    fn normalized_uv_center_is_center_of_mass() {
+        let face = Workplane::xy().rect(4.0, 2.0).to_face();
+
+        assert_close(face.point_at_normalized_uv(0.5, 0.5), face.center_of_mass());
+    }
+
+    #[test]
+    fn normalized_uv_corners_match_face_bounds() {
+        let translation = dvec3(0.0, 0.0, 3.0);
+        let half_extents = dvec3(2.0, 1.0, 0.0);
+        let face = Workplane::xy()
+            .translated(translation)
+            .rect(2.0 * half_extents.x, 2.0 * half_extents.y)
+            .to_face();
+
+        let actual_corners = [
+            face.point_at_normalized_uv(0.0, 0.0),
+            face.point_at_normalized_uv(1.0, 0.0),
+            face.point_at_normalized_uv(0.0, 1.0),
+            face.point_at_normalized_uv(1.0, 1.0),
+        ];
+        let expected_corners = [
+            translation + dvec3(-half_extents.x, -half_extents.y, 0.0),
+            translation + dvec3(-half_extents.x, half_extents.y, 0.0),
+            translation + dvec3(half_extents.x, -half_extents.y, 0.0),
+            translation + dvec3(half_extents.x, half_extents.y, 0.0),
+        ];
+
+        for expected_corner in expected_corners {
+            assert!(
+                actual_corners.iter().any(|actual| actual.distance(expected_corner) < 1e-6),
+                "expected UV corner at {expected_corner}, got {actual_corners:?}"
+            );
+        }
     }
 }
