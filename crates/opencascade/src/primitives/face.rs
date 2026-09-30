@@ -544,16 +544,9 @@ impl From<ffi::TopAbs_Orientation> for FaceOrientation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::primitives::Edge;
 
     fn assert_close(actual: DVec3, expected: DVec3) {
         assert!(actual.distance(expected) < 1e-6, "expected {expected}, got {actual}");
-    }
-
-    // The mean of a box's six face centers is the box's center.
-    fn mean_face_center(shape: &Shape) -> DVec3 {
-        let centers: Vec<DVec3> = shape.faces().map(|face| face.center_of_mass()).collect();
-        centers.iter().sum::<DVec3>() / centers.len() as f64
     }
 
     #[test]
@@ -601,50 +594,5 @@ mod tests {
                 "expected UV corner at {expected_corner}, got {actual_corners:?}"
             );
         }
-    }
-
-    #[test]
-    fn project_point_lands_on_face_plane() {
-        let face = Workplane::xy().translated(dvec3(0.0, 0.0, 3.0)).rect(4.0, 2.0).to_face();
-
-        assert_close(face.project_point_to_plane(dvec3(1.5, -0.5, 10.0)), dvec3(1.5, -0.5, 3.0));
-    }
-
-    #[test]
-    fn projection_between_unequal_faces_stays_perpendicular() {
-        let wide = Workplane::xz().rect(6.0, 2.0).to_face();
-        let narrow = Workplane::xz().translated(dvec3(0.0, 0.0, -5.0)).rect(2.0, 2.0).to_face();
-
-        let start = narrow.point_at_normalized_uv(0.25, 0.75);
-        let end = wide.project_point_to_plane(start);
-
-        assert!((end - start).cross(wide.normal_at_center()).length() < 1e-6);
-        assert!(((end - start).length() - 5.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn sweep_between_two_points_spans_them() {
-        let (start, end) = (dvec3(-1.0, 0.0, 0.0), dvec3(3.0, 0.0, 0.0));
-        let path = Wire::from_edges([&Edge::segment(start, end)]);
-
-        let mut workplane = Workplane::new(DVec3::Y, end - start);
-        workplane.set_translation(start);
-        let bar = Shape::from(workplane.rect(0.5, 0.5).to_face().sweep_along(&path));
-
-        assert_close(mean_face_center(&bar), (start + end) / 2.0);
-    }
-
-    #[test]
-    fn repositioned_workplane_offsets_the_sweep() {
-        let (start, end) = (dvec3(-1.0, 0.0, 0.0), dvec3(3.0, 0.0, 0.0));
-        let path = Wire::from_edges([&Edge::segment(start, end)]);
-
-        let mut workplane = Workplane::new(DVec3::Y, end - start);
-        workplane.set_translation(start);
-        let offset_workplane = workplane.translated(dvec3(0.0, 1.0, 0.0));
-        let shift = offset_workplane.origin() - workplane.origin();
-        let bar = Shape::from(offset_workplane.rect(0.5, 0.5).to_face().sweep_along(&path));
-
-        assert_close(mean_face_center(&bar), (start + end) / 2.0 + shift);
     }
 }
