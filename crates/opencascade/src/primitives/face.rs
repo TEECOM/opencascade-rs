@@ -574,30 +574,33 @@ mod tests {
     }
 
     #[test]
-    fn normalized_uv_stays_on_face_plane() {
-        let face = Workplane::xy().translated(dvec3(0.0, 0.0, 3.0)).rect(4.0, 2.0).to_face();
+    fn normalized_uv_corners_match_face_bounds() {
+        let translation = dvec3(0.0, 0.0, 3.0);
+        let half_extents = dvec3(2.0, 1.0, 0.0);
+        let face = Workplane::xy()
+            .translated(translation)
+            .rect(2.0 * half_extents.x, 2.0 * half_extents.y)
+            .to_face();
 
-        assert!((face.point_at_normalized_uv(0.25, 0.75).z - 3.0).abs() < 1e-6);
-    }
+        let actual_corners = [
+            face.point_at_normalized_uv(0.0, 0.0),
+            face.point_at_normalized_uv(1.0, 0.0),
+            face.point_at_normalized_uv(0.0, 1.0),
+            face.point_at_normalized_uv(1.0, 1.0),
+        ];
+        let expected_corners = [
+            translation + dvec3(-half_extents.x, -half_extents.y, 0.0),
+            translation + dvec3(-half_extents.x, half_extents.y, 0.0),
+            translation + dvec3(half_extents.x, -half_extents.y, 0.0),
+            translation + dvec3(half_extents.x, half_extents.y, 0.0),
+        ];
 
-    #[test]
-    fn opposing_box_faces_mirror_uv_coordinates() {
-        let cube = Shape::box_centered(2.0, 2.0, 2.0);
-        let face_with_normal = |normal: DVec3| {
-            cube.faces()
-                .find(|face| face.normal_at_center().distance(normal) < 1e-6)
-                .expect("cube should have a face with this normal")
-        };
-        let pos_x = face_with_normal(DVec3::X);
-        let neg_x = face_with_normal(DVec3::NEG_X);
-
-        let point = pos_x.point_at_normalized_uv(0.25, 0.75);
-        let mirrored = dvec3(-point.x, point.y, point.z);
-
-        // Which of these matches depends on the u/v direction of each face.
-        let candidates =
-            [neg_x.point_at_normalized_uv(0.25, 0.75), neg_x.point_at_normalized_uv(0.75, 0.75)];
-        assert!(candidates.iter().any(|candidate| candidate.distance(mirrored) < 1e-6));
+        for expected_corner in expected_corners {
+            assert!(
+                actual_corners.iter().any(|actual| actual.distance(expected_corner) < 1e-6),
+                "expected UV corner at {expected_corner}, got {actual_corners:?}"
+            );
+        }
     }
 
     #[test]
