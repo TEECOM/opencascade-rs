@@ -1415,13 +1415,7 @@ pub mod ffi {
 
         // BRepTools
         pub fn outer_wire(face: &TopoDS_Face) -> UniquePtr<TopoDS_Wire>;
-        pub fn face_uv_bounds(
-            face: &TopoDS_Face,
-            u_min: &mut f64,
-            u_max: &mut f64,
-            v_min: &mut f64,
-            v_max: &mut f64,
-        );
+        pub fn face_uv_bounds(face: &TopoDS_Face) -> [f64; 4];
         pub fn write_brep_text(shape: &TopoDS_Shape, path: String) -> bool;
         pub fn read_brep_text(path: String) -> UniquePtr<TopoDS_Shape>;
 

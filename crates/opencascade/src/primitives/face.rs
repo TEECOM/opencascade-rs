@@ -281,8 +281,7 @@ impl Face {
 
     /// Parameter-space bounds of the face as `((u_min, u_max), (v_min, v_max))`.
     pub fn uv_bounds(&self) -> ((f64, f64), (f64, f64)) {
-        let (mut u_min, mut u_max, mut v_min, mut v_max) = (0.0, 0.0, 0.0, 0.0);
-        ffi::face_uv_bounds(&self.inner, &mut u_min, &mut u_max, &mut v_min, &mut v_max);
+        let [u_min, u_max, v_min, v_max] = ffi::face_uv_bounds(&self.inner);
 
         ((u_min, u_max), (v_min, v_max))
     }

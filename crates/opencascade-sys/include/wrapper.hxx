@@ -1,4 +1,5 @@
 #include "rust/cxx.h"
+#include <array>
 #include <BOPAlgo_GlueEnum.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAlgoAPI_Common.hxx>
@@ -481,9 +482,10 @@ inline std::unique_ptr<TopoDS_Wire> outer_wire(const TopoDS_Face &face) {
   return std::unique_ptr<TopoDS_Wire>(new TopoDS_Wire(BRepTools::OuterWire(face)));
 }
 
-inline void face_uv_bounds(const TopoDS_Face &face, Standard_Real &u_min, Standard_Real &u_max, Standard_Real &v_min,
-                           Standard_Real &v_max) {
+inline std::array<Standard_Real, 4> face_uv_bounds(const TopoDS_Face &face) {
+  Standard_Real u_min, u_max, v_min, v_max;
   BRepTools::UVBounds(face, u_min, u_max, v_min, v_max);
+  return {u_min, u_max, v_min, v_max};
 }
 
 inline bool write_brep_text(const TopoDS_Shape &shape, rust::String path) {
