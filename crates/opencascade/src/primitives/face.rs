@@ -294,10 +294,12 @@ impl Face {
         dvec3(point.X(), point.Y(), point.Z())
     }
 
-    /// Evaluate the face at `(u, v)` in `[0, 1]` across its parameter bounds.
+    /// Evaluate the face at `(u, v)` in its parameter domain, then normalize
+    /// to the range `[0, 1]`.
     ///
-    /// Only meaningful for planar faces, and the u/v axis directions depend on how the face
-    /// was built, so opposing faces may need mirrored coordinates.
+    /// Only meaningful for planar faces. Note that `u` and `v` axis directions depend on
+    /// how the face was built. Faces constructed or oriented in different coordinate
+    /// frames will not necessarily produce aligned points.
     pub fn point_at_normalized_uv(&self, u: f64, v: f64) -> DVec3 {
         let ((u_min, u_max), (v_min, v_max)) = self.uv_bounds();
 
