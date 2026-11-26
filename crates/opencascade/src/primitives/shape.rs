@@ -280,6 +280,27 @@ impl Shape {
         Self { inner }
     }
 
+    /// Clone a `Shape` from a raw pointer to a C++ `TopoDS_Shape`.
+    ///
+    /// Returns `None` if `ptr` is null or if the underlying `TopoDS_Shape` is null (`IsNull()`).
+    ///
+    /// # Safety
+    ///
+    /// If `ptr` is non-null, it must point to a valid, initialized `TopoDS_Shape`
+    /// instance that remains valid for the duration of this call.
+    pub unsafe fn clone_from_raw(ptr: *const std::ffi::c_void) -> Option<Self> {
+        if ptr.is_null() {
+            return None;
+        }
+
+        let shape = unsafe { &*ptr.cast::<ffi::TopoDS_Shape>() };
+        if shape.IsNull() {
+            return None;
+        }
+
+        Some(Self::from_shape(shape))
+    }
+
     /// Make a shape that models empty space.
     pub fn empty() -> Self {
         // NOTE: It may seem like using `TopoDS_Shape()` directly should work,
@@ -822,8 +843,29 @@ impl ChamferMaker {
 
 #[cfg(test)]
 mod test {
-    use crate::{primitives::IntoShape, workplane::Workplane};
+    use crate::{
+        primitives::{IntoShape, Shape, ShapeType},
+        workplane::Workplane,
+    };
+    use opencascade_sys::ffi;
+    use std::{ffi::c_void, ptr};
+
     const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn clone_from_raw() {
+        assert!(unsafe { Shape::clone_from_raw(ptr::null()) }.is_none());
+
+        let shape = Shape::cube(1.0);
+        let raw_ptr = (&*shape.inner as *const ffi::TopoDS_Shape).cast::<c_void>();
+        let cloned = unsafe { Shape::clone_from_raw(raw_ptr) }.expect("valid shape pointer");
+
+        assert!(cloned.inner.IsEqual(&shape.inner));
+        drop(shape);
+
+        assert_eq!(cloned.shape_type(), ShapeType::Solid);
+        assert_eq!(cloned.faces().count(), 6);
+    }
 
     #[test]
     fn transform_shape() {
